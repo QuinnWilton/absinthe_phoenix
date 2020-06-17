@@ -23,7 +23,7 @@ defmodule Absinthe.Phoenix.ControllerTest do
 
       field :input_object_with_integers, :deep_integers do
         arg :echo, :deep_integers_input
-        resolve &resolve_echo/3
+        resolve &resolve_echo_deep_integers/3
       end
     end
 
@@ -41,6 +41,15 @@ defmodule Absinthe.Phoenix.ControllerTest do
 
     def resolve_echo(_, %{echo: echo}, _) do
       {:ok, echo}
+    end
+
+    def resolve_echo_deep_integers(_, %{echo: echo}, _) do
+      {:ok,
+       %DeepIntegers{
+         foo: echo.foo,
+         bar: echo.bar,
+         baz: echo.baz
+       }}
     end
   end
 
@@ -90,6 +99,13 @@ defmodule Absinthe.Phoenix.ControllerTest do
     query ($echo: DeepIntegersInput) { input_object_with_integers(echo: $echo) }
     """
     def input_object_with_integers(conn, %{data: data}), do: json(conn, data)
+
+    @graphql """
+    query ($echo: DeepIntegersInput) { input_object_with_integers(echo: $echo) @put }
+    """
+    def put_directive(conn, %{data: %DeepIntegers{} = result}) do
+      json(conn, result)
+    end
   end
 
   describe "input" do
@@ -109,6 +125,13 @@ defmodule Absinthe.Phoenix.ControllerTest do
     test "input object with integers" do
       assert %{"input_object_with_integers" => %{"foo" => 1, "bar" => 2, "baz" => 3}} ==
                result(Controller, :input_object_with_integers, %{
+                 "echo" => %{"foo" => "1", "bar" => "2", "baz" => "3"}
+               })
+    end
+
+    test "the @put directive resolves fields as their underlying struct" do
+      assert %{"input_object_with_integers" => %{"foo" => 1, "bar" => 2, "baz" => 3}} ==
+               result(Controller, :put_directive, %{
                  "echo" => %{"foo" => "1", "bar" => "2", "baz" => "3"}
                })
     end
